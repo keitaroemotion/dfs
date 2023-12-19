@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import re
+import sys
+
+file_path=sys.argv[1]
+
+lines = []
+with open(file_path, 'r') as file:
+    for line in file:
+        line = line.rstrip()
+        lines.append(line)
+
+def is_create_table(line):
+  return re.search(r"^CREATE TABLE ", line)
+
+TABLE_PATTERN = "Table structure for table "
+
+def is_table(line):
+  return re.search(r"^-- Table ", line)
+
+def is_irrelevant_pattern(line):
+  return (re.search(r"^--.*", line) and 'Table' not in line) or \
+          is_comment(line)
+
+def is_comment(line):
+  return re.search(r"^\/\*", line)
+
+def is_relevant_pattern(line):
+  return not is_irrelevant_pattern(line) and line != ''
+
+def get_table_name(line):
+  return line.replace(TABLE_PATTERN, '').strip().replace("`", "")
+
+def refine_key(x):
+    return x.replace("--", '').replace("`", "").strip()
+
+lines.reverse()
+
+sqls_original = {}
+sqls = {}
+xs   = []
+
+i = 0
+for line in lines:
+    if(is_relevant_pattern(line)):
+        xs.append(line)
+        if(is_table(line)):
+            table_name = refine_key(get_table_name(line))
+            xs.reverse()
+            sqls[table_name] = [xs, [x for x in xs if "FOREIGN KEY" in x]]
+            xs = []
+            table_name = get_table_name(line)
+
+    i = i + 1
+
+key_fk_map = {}
+
+keys = []
+
+for key, xs in sqls.items():
+    key = refine_key(key)
+    keys.append(key)
+    key = key.replace("--", '').strip()
+    # for x in xs[0]:
+    #     print(f"    {x}")
+    for x in xs[1]:
+        pattern = r'`([^`]+)`'
+        match = re.search(pattern, x.split("REFERENCES")[1])
+
+        if match:
+            extracted_text = refine_key(match.group(1))
+            if(key not in key_fk_map):
+                key_fk_map[key] = []
+            key_fk_map[key].append(extracted_text)
+            # print(f"        {extracted_text}")
+
+#
+# t1 [t2, t3, t4]
+# t2 [t5, t6]
+# t3 [t7, t8]
+#
+
+def swap_table(k, fk, xs):
+    if(k  not in xs): xs.append(k)
+    if(fk not in xs): xs.append(fk)
+
+    ki  = xs.index(k)
+    fki = xs.index(fk)
+    if(ki < fki):
+        tmp     = xs[fki]
+        xs[fki] = xs[ki]
+        xs[ki]  = tmp
+    return xs
+
+for key in keys:
+    if(key not in key_fk_map.keys()):
+      key_fk_map[key] = []
+
+def is_same_array_order(xs, ys):
+    for i, x in enumerate(xs):
+        if(ys[i] != xs[i]): 
+            return False
+    return True
+
+def sort_tables(orders, orders_sorted, key_fk_map):
+
+    for key, fks in key_fk_map.items():
+        print(f"swapping: {key}: {fks}")
+        for fk in fks:
+            orders_sorted = swap_table(key, fk, orders_sorted)
+
+        print(f"orders: [{orders_sorted}]")
+    
+    is_order_complete = is_same_array_order(orders, orders_sorted)
+    if(is_order_complete):
+        return orders_sorted 
+    else: 
+        return sorted_tables(orders, orders_sorted, key_fk_map)
+
+orders = list(key_fk_map.keys())
+sorted_tables = sort_tables(orders, orders, key_fk_map)
+print(sorted_tables)
+
+def flatten(nested_list):
+    flat_list = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flat_list.extend(flatten(item))
+        else:
+            flat_list.append(item)
+    return flat_list
+
+with open(file_path, 'w') as file:
+    for table in sorted_tables:
+        for line in sqls[table][0]:
+            if(line.strip().startswith('--')):
+                line = f"\n{line}\n"
+            print(line)
+            file.write(f"{line}\n")
