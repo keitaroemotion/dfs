@@ -8,7 +8,7 @@ This script is written for the following demands:
 4. The requirement means dumped mysql file injection fails (since FK keys binding fails)
 5. He told me manually change the order of table is fine
 6. But this table schema change happens frequently. Should I manually change the order each time I dump?
-7. I think 6. is insame and inhuman way as developer.
+7. I think 6. is insane and inhuman way as developer.
 
 ## Installation
 
@@ -20,8 +20,6 @@ Just move this to `/usr/local/bin` or any such kind of accessible directory, and
 dfs [your sql file path]
 ```
 
-## Notes
+## Contact
 
-API design is to grasp the usecase and workflow. However, agile development is not to
-waste too much time on the swagger design stuff but divide the entire development
-cycle into chunks of Sprint, then each dev work on the set of design and implementation.
+`tobasojyo@gmail.com`
